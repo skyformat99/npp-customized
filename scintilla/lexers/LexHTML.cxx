@@ -65,6 +65,14 @@ static void GetTextSegment(Accessor &styler, unsigned int start, unsigned int en
 	s[i] = '\0';
 }
 
+static void GetTextSegmentKeepingLetterCase(Accessor &styler, unsigned int start, unsigned int end, char *s, size_t len) {
+	unsigned int i = 0;
+	for (; (i < end - start + 1) && (i < len-1); i++) {
+		s[i] = static_cast<char>(styler[start + i]);
+	}
+	s[i] = '\0';
+}
+
 static const char *GetNextWord(Accessor &styler, unsigned int start, char *s, size_t sLen) {
 
 	unsigned int i = 0;
@@ -383,16 +391,18 @@ static void classifyWordHTPy(unsigned int start, unsigned int end, WordList &key
 
 // Update the word colour to default or keyword
 // Called when in a PHP word
-static void classifyWordHTPHP(unsigned int start, unsigned int end, WordList &keywords, Accessor &styler) {
+static void classifyWordHTPHP(unsigned int start, unsigned int end, WordList &keywords, WordList &keywords_func, Accessor &styler) {
 	char chAttr = SCE_HPHP_DEFAULT;
 	bool wordIsNumber = IsADigit(styler[start]) || (styler[start] == '.' && start+1 <= end && IsADigit(styler[start+1]));
 	if (wordIsNumber) {
 		chAttr = SCE_HPHP_NUMBER;
 	} else {
 		char s[100];
-		GetTextSegment(styler, start, end, s, sizeof(s));
+		GetTextSegmentKeepingLetterCase(styler, start, end, s, sizeof(s));
 		if (keywords.InList(s))
 			chAttr = SCE_HPHP_WORD;
+		else if (keywords_func.InList(s))
+			chAttr = SCE_HPHP_FUNCTION;
 	}
 	styler.ColourTo(end, chAttr);
 }
@@ -575,6 +585,7 @@ static void ColouriseHyperTextDoc(unsigned int startPos, int length, int initSty
 	WordList &keywords4 = *keywordlists[3];
 	WordList &keywords5 = *keywordlists[4];
 	WordList &keywords6 = *keywordlists[5]; // SGML (DTD) keywords
+	WordList &keywords7 = *keywordlists[6];
 
 	styler.StartAt(startPos);
 	char prevWord[200];
@@ -1176,7 +1187,8 @@ static void ColouriseHyperTextDoc(unsigned int startPos, int length, int initSty
 				classifyWordHTPy(styler.GetStartSegment(), i - 1, keywords4, styler, prevWord, inScriptType, isMako);
 				break;
 			case SCE_HPHP_WORD:
-				classifyWordHTPHP(styler.GetStartSegment(), i - 1, keywords5, styler);
+			case SCE_HPHP_FUNCTION:
+				classifyWordHTPHP(styler.GetStartSegment(), i - 1, keywords5, keywords7, styler);
 				break;
 			case SCE_H_XCCOMMENT:
 				styler.ColourTo(i - 1, state);
@@ -1913,8 +1925,9 @@ static void ColouriseHyperTextDoc(unsigned int startPos, int length, int initSty
 			break;
 			///////////// start - PHP state handling
 		case SCE_HPHP_WORD:
+		case SCE_HPHP_FUNCTION:
 			if (!IsAWordChar(ch)) {
-				classifyWordHTPHP(styler.GetStartSegment(), i - 1, keywords5, styler);
+				classifyWordHTPHP(styler.GetStartSegment(), i - 1, keywords5, keywords7, styler);
 				if (ch == '/' && chNext == '*') {
 					i++;
 					state = SCE_HPHP_COMMENT;
@@ -2132,7 +2145,8 @@ static void ColouriseHyperTextDoc(unsigned int startPos, int length, int initSty
 		classifyWordHTPy(styler.GetStartSegment(), lengthDoc - 1, keywords4, styler, prevWord, inScriptType, isMako);
 		break;
 	case SCE_HPHP_WORD:
-		classifyWordHTPHP(styler.GetStartSegment(), lengthDoc - 1, keywords5, styler);
+	case SCE_HPHP_FUNCTION:
+		classifyWordHTPHP(styler.GetStartSegment(), lengthDoc - 1, keywords5, keywords7, styler);
 		break;
 	default:
 		StateToPrint = statePrintForState(state, inScriptType);
@@ -2174,6 +2188,7 @@ static const char * const htmlWordListDesc[] = {
 	"Python keywords",
 	"PHP keywords",
 	"SGML and DTD keywords",
+	"PHP functions",
 	0,
 };
 
@@ -2184,6 +2199,7 @@ static const char * const phpscriptWordListDesc[] = {
 	"", //Unused
 	"PHP keywords",
 	"", //Unused
+	"PHP functions",
 	0,
 };
 

@@ -602,15 +602,22 @@ void ScintillaEditView::setEmbeddedPhpLexer()
 {
 	const TCHAR *pKwArray[10] = {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
 	makeStyle(L_PHP, pKwArray);
+    
+    // from ScintillaEditView::setLexer() and ScintillaEditView::setKeywords()
 
-	basic_string<char> keywordList("");
-	if (pKwArray[LANG_INDEX_INSTR])
-	{
-		basic_string<wchar_t> kwlW = pKwArray[LANG_INDEX_INSTR];
-		keywordList = wstring2string(kwlW, CP_ACP);
-	}
+	WcharMbcsConvertor *wmc = WcharMbcsConvertor::getInstance();
 
-	execute(SCI_SETKEYWORDS, 4, (LPARAM)getCompleteKeywordList(keywordList, L_PHP, LANG_INDEX_INSTR));
+    {
+		const char * keyWords_char = wmc->wchar2char(pKwArray[LANG_INDEX_INSTR], CP_ACP);
+        std::basic_string<char> wordList = (keyWords_char) ? keyWords_char : "";
+        execute(SCI_SETKEYWORDS, 4, (LPARAM)getCompleteKeywordList(wordList, L_PHP, LANG_INDEX_INSTR));
+    }
+
+    {
+        const char * keyWords_char = wmc->wchar2char(pKwArray[LANG_INDEX_INSTR2], CP_ACP);
+        std::basic_string<char> wordList = (keyWords_char) ? keyWords_char : "";
+        execute(SCI_SETKEYWORDS, 6, (LPARAM)getCompleteKeywordList(wordList, L_PHP, LANG_INDEX_INSTR2));
+    }
 
 	execute(SCI_STYLESETEOLFILLED, SCE_HPHP_DEFAULT, true);
 	execute(SCI_STYLESETEOLFILLED, SCE_HPHP_COMMENT, true);
