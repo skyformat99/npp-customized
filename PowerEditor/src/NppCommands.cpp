@@ -42,6 +42,8 @@ using namespace std;
 
 void Notepad_plus::macroPlayback(Macro macro)
 {
+	LongRunningOperation op;
+
 	_pEditView->execute(SCI_BEGINUNDOACTION);
 
 	for (Macro::iterator step = macro.begin(); step != macro.end(); ++step)
@@ -1702,13 +1704,13 @@ void Notepad_plus::command(int id)
 		case IDM_FORMAT_TOUNIX:
 		case IDM_FORMAT_TOMAC:
 		{
-			FormatType newFormat = (id == IDM_FORMAT_TODOS)
-				? FormatType::windows
-				: (id == IDM_FORMAT_TOUNIX) ? FormatType::unix : FormatType::macos;
+			EolType newFormat = (id == IDM_FORMAT_TODOS)
+				? EolType::windows
+				: (id == IDM_FORMAT_TOUNIX) ? EolType::unix : EolType::macos;
 
 			Buffer* buf = _pEditView->getCurrentBuffer();
-			buf->setFormat(newFormat);
-			_pEditView->execute(SCI_CONVERTEOLS, static_cast<int>(buf->getFormat()));
+			buf->setEolFormat(newFormat);
+			_pEditView->execute(SCI_CONVERTEOLS, static_cast<int>(buf->getEolFormat()));
 			break;
 		}
 
@@ -2677,10 +2679,18 @@ void Notepad_plus::command(int id)
 				TCHAR langName[langNameLenMax];
 				::GetMenuString(_mainMenuHandle, id, langName, langNameLenMax, MF_BYCOMMAND);
 				_pEditView->getCurrentBuffer()->setLangType(L_USER, langName);
+				if (_pDocMap)
+				{
+					_pDocMap->setSyntaxHiliting();
+				}
 			}
 			else if ((id >= IDM_LANG_EXTERNAL) && (id <= IDM_LANG_EXTERNAL_LIMIT))
 			{
 				setLanguage((LangType)(id - IDM_LANG_EXTERNAL + L_EXTERNAL));
+				if (_pDocMap)
+				{
+					_pDocMap->setSyntaxHiliting();
+				}
 			}
 			else if ((id >= ID_MACRO) && (id < ID_MACRO_LIMIT))
 			{

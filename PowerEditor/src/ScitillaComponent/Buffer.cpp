@@ -54,7 +54,7 @@ long Buffer::_recentTagCtr = 0;
 namespace // anonymous
 {
 
-	static FormatType getEOLFormatForm(const char* const data, size_t length, FormatType defvalue = FormatType::osdefault)
+	static EolType getEOLFormatForm(const char* const data, size_t length, EolType defvalue = EolType::osdefault)
 	{
 		assert(length == 0 or data != nullptr && "invalid buffer for getEOLFormatForm()");
 
@@ -63,13 +63,13 @@ namespace // anonymous
 			if (data[i] == CR)
 			{
 				if (i + 1 < length && data[i + 1] == LF)
-					return FormatType::windows;
+					return EolType::windows;
 
-				return FormatType::macos;
+				return EolType::macos;
 			}
 
 			if (data[i] == LF)
-				return FormatType::unix;
+				return EolType::unix;
 		}
 
 		return defvalue; // fallback unknown
@@ -91,7 +91,7 @@ Buffer::Buffer(FileManager * pManager, BufferID id, Document doc, DocFileStatus 
 	NppParameters* pNppParamInst = NppParameters::getInstance();
 	const NewDocDefaultSettings& ndds = (pNppParamInst->getNppGUI()).getNewDocDefaultSettings();
 
-	_format = ndds._format;
+	_eolFormat = ndds._format;
 	_unicodeMode = ndds._unicodeMode;
 	_encoding = ndds._codepage;
 	if (_encoding != -1)
@@ -592,9 +592,9 @@ BufferID FileManager::loadFile(const TCHAR * filename, Document doc, int encodin
 	Utf8_16_Read UnicodeConvertor;	//declare here so we can get information after loading is done
 
 	char data[blockSize + 8]; // +8 for incomplete multibyte char
-	FormatType bkformat = FormatType::unknown;
+	EolType bkformat = EolType::unknown;
 	LangType detectedLang = L_TEXT;
-	bool res = loadFileData(doc, backupFileName ? backupFileName : fullpath, data, &UnicodeConvertor, detectedLang, encoding, &bkformat);
+	bool res = loadFileData(doc, backupFileName ? backupFileName : fullpath, data, &UnicodeConvertor, detectedLang, encoding, bkformat);
 	if (res)
 	{
 		Buffer* newBuf = new Buffer(this, _nextBufferID, doc, DOC_REGULAR, fullpath);
@@ -627,15 +627,6 @@ BufferID FileManager::loadFile(const TCHAR * filename, Document doc, int encodin
 
 		if (encoding == -1)
 		{
-			// 3 formats : WIN_FORMAT, UNIX_FORMAT and MAC_FORMAT
-			if (nullptr != UnicodeConvertor.getNewBuf())
-			{
-				FormatType format = getEOLFormatForm(UnicodeConvertor.getNewBuf(), UnicodeConvertor.getNewSize());
-				buf->setFormat(format);
-			}
-			else
-				buf->setFormat(FormatType::osdefault);
-
 			UniMode um = UnicodeConvertor.getEncoding();
 			if (um == uni7Bit)
 				um = (ndds._openAnsiAsUtf8) ? uniCookie : uni8Bit;
@@ -647,8 +638,9 @@ BufferID FileManager::loadFile(const TCHAR * filename, Document doc, int encodin
             // Test if encoding is set to UTF8 w/o BOM (usually for utf8 indicator of xml or html)
             buf->setEncoding((encoding == SC_CP_UTF8)?-1:encoding);
             buf->setUnicodeMode(uniCookie);
-			buf->setFormat(bkformat);
 		}
+
+		buf->setEolFormat(bkformat);
 
 		//determine buffer properties
 		++_nextBufferID;
@@ -671,30 +663,25 @@ bool FileManager::reloadBuffer(BufferID id)
 	buf->_canNotify = false;	//disable notify during file load, we dont want dirty to be triggered
 	int encoding = buf->getEncoding();
 	char data[blockSize + 8]; // +8 for incomplete multibyte char
-	FormatType bkformat;
+	EolType bkformat;
 	LangType lang = buf->getLangType();
 
-	bool res = loadFileData(doc, buf->getFullPathName(), data, &UnicodeConvertor, lang, encoding, &bkformat);
+
+	buf->setLoadedDirty(false);	// Since the buffer will be reloaded from the disk, and it will be clean (not dirty), we can set _isLoadedDirty false safetly.
+								// Set _isLoadedDirty false before calling "_pscratchTilla->execute(SCI_CLEARALL);" in loadFileData() to avoid setDirty in SCN_SAVEPOINTREACHED / SCN_SAVEPOINTLEFT
+
+	bool res = loadFileData(doc, buf->getFullPathName(), data, &UnicodeConvertor, lang, encoding, bkformat);
 	buf->_canNotify = true;
 
 	if (res)
 	{
 		if (encoding == -1)
 		{
-			if (nullptr != UnicodeConvertor.getNewBuf())
-			{
-				FormatType format = getEOLFormatForm(UnicodeConvertor.getNewBuf(), UnicodeConvertor.getNewSize());
-				buf->setFormat(format);
-			}
-			else
-				buf->setFormat(FormatType::osdefault);
-
 			buf->setUnicodeMode(UnicodeConvertor.getEncoding());
 		}
 		else
 		{
 			buf->setEncoding(encoding);
-			buf->setFormat(bkformat);
 			buf->setUnicodeMode(uniCookie);
 		}
 	}
@@ -1253,75 +1240,94 @@ int FileManager::detectCodepage(char* buf, size_t len)
 
 LangType FileManager::detectLanguageFromTextBegining(const unsigned char *data, unsigned int dataLen)
 {
-	// it detectes xml, php and bash script file
-	std::string xmlHeader = "<?xml "; // length : 6
-	std::string phpHeader = "<?php "; // length : 6 
-	std::string shebang1 = "#!/bin/sh"; // length : 9
-	std::string shebang2 = "#!/bin/bash"; // length : 11
-	std::string htmlHeader2 = "<html>"; // length : 6
-	std::string htmlHeader1 = "<!DOCTYPE html>"; // length : 15
-	
-	const size_t longestLength = htmlHeader1.length(); // longest length : html header Length
-	const size_t shortestLength = xmlHeader.length();
-	
-	size_t i = 0;
-	
-	if (dataLen <= shortestLength)
+	struct FirstLineLanguages
+	{
+		std::string pattern;
+		LangType lang;
+	};
+
+	// Is the buffer at least the size of a BOM?
+	if (dataLen <= 3)
 		return L_TEXT;
 
 	// Eliminate BOM if present
+	size_t i = 0;
 	if ((data[0] == 0xEF && data[1] == 0xBB && data[2] == 0xBF) || // UTF8 BOM
 		(data[0] == 0xFE && data[1] == 0xFF && data[2] == 0x00) || // UTF16 BE BOM
 		(data[0] == 0xFF && data[1] == 0xFE && data[2] == 0x00))   // UTF16 LE BOM
 		i += 3;
 
+	// Skip any space-like char
 	for (; i < dataLen; ++i)
 	{
 		if (data[i] != ' ' && data[i] != '\t' && data[i] != '\n' && data[i] != '\r')
 			break;
 	}
 
+	// Create the buffer to need to test
+	const size_t longestLength = 40; // shebangs can be large
 	std::string buf2Test = std::string((const char *)data + i, longestLength);
 
-	auto res = std::mismatch(shebang1.begin(), shebang1.end(), buf2Test.begin());
-	if (res.first == shebang1.end())
+	// Is there a \r or \n in the buffer? If so, truncate it
+	auto cr = buf2Test.find("\r");
+	auto nl = buf2Test.find("\n");
+	auto crnl = min(cr, nl);
+	if (crnl != std::string::npos && crnl < longestLength)
+		buf2Test = std::string((const char *)data + i, crnl);
+
+	// First test for a Unix-like Shebang
+	// See https://en.wikipedia.org/wiki/Shebang_%28Unix%29 for more details about Shebang
+	std::string shebang = "#!";
+	auto res = std::mismatch(shebang.begin(), shebang.end(), buf2Test.begin());
+	if (res.first == shebang.end())
 	{
-		return L_BASH;
-	}
-	res = std::mismatch(shebang2.begin(), shebang2.end(), buf2Test.begin());
-	if (res.first == shebang2.end())
-	{
-		return L_BASH;
+		// Make a list of the most commonly used languages
+		const size_t SHEBANG_LANGUAGES = 6;
+		FirstLineLanguages ShebangLangs[SHEBANG_LANGUAGES] = {
+			{ "sh",		L_BASH },
+			{ "python", L_PYTHON },
+			{ "perl",	L_PERL },
+			{ "php",	L_PHP },
+			{ "ruby",	L_RUBY },
+			{ "node",	L_JAVASCRIPT },
+		};
+
+		// Go through the list of languages
+		for (i = 0; i < SHEBANG_LANGUAGES; ++i)
+		{
+			if (buf2Test.find(ShebangLangs[i].pattern) != std::string::npos)
+			{
+				return ShebangLangs[i].lang;
+			}
+		}
+
+		// Unrecognized shebang (there is always room for improvement ;-)
+		return L_TEXT;
 	}
 
-	res = std::mismatch(phpHeader.begin(), phpHeader.end(), buf2Test.begin());
-	if (res.first == phpHeader.end())
+	// Are there any other patterns we know off?
+	const size_t FIRST_LINE_LANGUAGES = 4;
+	FirstLineLanguages languages[FIRST_LINE_LANGUAGES] = {
+		{ "<?xml",			L_XML },
+		{ "<?php",			L_PHP },
+		{ "<html",			L_HTML },
+		{ "<!DOCTYPE html",	L_HTML },
+	};
+
+	for (i = 0; i < FIRST_LINE_LANGUAGES; ++i)
 	{
-		return L_PHP;
+		res = std::mismatch(languages[i].pattern.begin(), languages[i].pattern.end(), buf2Test.begin());
+		if (res.first == languages[i].pattern.end())
+		{
+			return languages[i].lang;
+		}
 	}
 
-	res = std::mismatch(xmlHeader.begin(), xmlHeader.end(), buf2Test.begin());
-	if (res.first == xmlHeader.end())
-	{
-		return L_XML;
-	}
-
-	res = std::mismatch(htmlHeader1.begin(), htmlHeader1.end(), buf2Test.begin());
-	if (res.first == htmlHeader1.end())
-	{
-		return L_HTML;
-	}
-	res = std::mismatch(htmlHeader2.begin(), htmlHeader2.end(), buf2Test.begin());
-	if (res.first == htmlHeader2.end())
-	{
-		return L_HTML;
-	}
-
+	// Unrecognized first line, we assume it is a text file for now
 	return L_TEXT;
 }
 
-inline bool FileManager::loadFileData(Document doc, const TCHAR * filename, char* data, Utf8_16_Read * UnicodeConvertor,
-	LangType & language, int & encoding, FormatType* pFormat)
+inline bool FileManager::loadFileData(Document doc, const TCHAR * filename, char* data, Utf8_16_Read * unicodeConvertor, LangType & language, int & encoding, EolType & eolFormat)
 {
 	FILE *fp = generic_fopen(filename, TEXT("rb"));
 	if (!fp)
@@ -1376,7 +1382,7 @@ inline bool FileManager::loadFileData(Document doc, const TCHAR * filename, char
 		_pscratchTilla->execute(SCI_SETCODEPAGE, SC_CP_UTF8);
 
 	bool success = true;
-	FormatType format = FormatType::unknown;
+	EolType format = EolType::unknown;
 	__try
 	{
 		// First allocate enough memory for the whole file (this will reduce memory copy during loading)
@@ -1433,13 +1439,15 @@ inline bool FileManager::loadFileData(Document doc, const TCHAR * filename, char
 					_pscratchTilla->execute(SCI_APPENDTEXT, newDataLen, (LPARAM)newData);
 				}
 
-				if (format == FormatType::unknown)
-					format = getEOLFormatForm(data, lenFile, FormatType::unknown);
+				if (format == EolType::unknown)
+					format = getEOLFormatForm(data, lenFile, EolType::unknown);
 			}
 			else
 			{
-				lenConvert = UnicodeConvertor->convert(data, lenFile);
-				_pscratchTilla->execute(SCI_APPENDTEXT, lenConvert, (LPARAM)(UnicodeConvertor->getNewBuf()));
+				lenConvert = unicodeConvertor->convert(data, lenFile);
+				_pscratchTilla->execute(SCI_APPENDTEXT, lenConvert, (LPARAM)(unicodeConvertor->getNewBuf()));
+				if (format == EolType::unknown)
+					format = getEOLFormatForm(unicodeConvertor->getNewBuf(), unicodeConvertor->getNewSize(), EolType::unknown);
 			}
 
 			if (_pscratchTilla->execute(SCI_GETSTATUS) != SC_STATUS_OK)
@@ -1448,7 +1456,7 @@ inline bool FileManager::loadFileData(Document doc, const TCHAR * filename, char
 			if (incompleteMultibyteChar != 0)
 			{
 				// copy bytes to next buffer
-				memcpy(data, data+blockSize-incompleteMultibyteChar, incompleteMultibyteChar);
+				memcpy(data, data + blockSize - incompleteMultibyteChar, incompleteMultibyteChar);
 			}
 
 		}
@@ -1463,8 +1471,16 @@ inline bool FileManager::loadFileData(Document doc, const TCHAR * filename, char
 	fclose(fp);
 
 	// broadcast the format
-	if (pFormat != nullptr)
-		*pFormat = (format != FormatType::unknown) ? format : FormatType::osdefault;
+	if (format == EolType::unknown)
+	{
+		NppParameters *pNppParamInst = NppParameters::getInstance();
+		const NewDocDefaultSettings & ndds = (pNppParamInst->getNppGUI()).getNewDocDefaultSettings(); // for ndds._format
+		eolFormat = ndds._format;
+	}
+	else
+	{
+		eolFormat = format;
+	}
 
 	_pscratchTilla->execute(SCI_EMPTYUNDOBUFFER);
 	_pscratchTilla->execute(SCI_SETSAVEPOINT);

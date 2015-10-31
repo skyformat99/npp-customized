@@ -1820,8 +1820,8 @@ void Notepad_plus::checkDocState()
 	enableCommand(IDM_FILE_DELETE, isFileExisting, MENU);
 	enableCommand(IDM_FILE_RENAME, isFileExisting, MENU);
 
-	enableConvertMenuItems(curBuf->getFormat());
-	checkUnicodeMenuItems(/*curBuf->getUnicodeMode()*/);
+	enableConvertMenuItems(curBuf->getEolFormat());
+	checkUnicodeMenuItems();
 	checkLangsMenu(-1);
 
 	if (_pAnsiCharPanel)
@@ -2117,15 +2117,15 @@ void Notepad_plus::setLangStatus(LangType langType)
 }
 
 
-void Notepad_plus::setDisplayFormat(FormatType format)
+void Notepad_plus::setDisplayFormat(EolType format)
 {
 	const TCHAR* str = TEXT("??");
 	switch (format)
 	{
-		case FormatType::windows: str = TEXT("Dos\\Windows"); break;
-		case FormatType::macos:   str = TEXT("Macintosh"); break;
-		case FormatType::unix:    str = TEXT("UNIX"); break;
-		case FormatType::unknown: str = TEXT("Unknown"); assert(false);  break;
+		case EolType::windows: str = TEXT("Dos\\Windows"); break;
+		case EolType::macos:   str = TEXT("Macintosh"); break;
+		case EolType::unix:    str = TEXT("UNIX"); break;
+		case EolType::unknown: str = TEXT("Unknown"); assert(false);  break;
 	}
 	_statusBar.setText(str, STATUSBAR_EOF_FORMAT);
 }
@@ -2365,7 +2365,7 @@ void Notepad_plus::maintainIndentation(TCHAR ch)
 	LangType type = _pEditView->getCurrentBuffer()->getLangType();
 
 	if (type == L_C || type == L_CPP || type == L_JAVA || type == L_CS || type == L_OBJC ||
-		type == L_PHP || type == L_JS || type == L_JSP || type == L_CSS)
+		type == L_PHP || type == L_JS || type == L_JAVASCRIPT || type == L_JSP || type == L_CSS)
 	{
 		if (((eolMode == SC_EOL_CRLF || eolMode == SC_EOL_LF) && ch == '\n') ||
 			(eolMode == SC_EOL_CR && ch == '\r'))
@@ -3498,16 +3498,16 @@ void Notepad_plus::staticCheckMenuAndTB() const
 void Notepad_plus::dynamicCheckMenuAndTB() const
 {
 	//Format conversion
-	enableConvertMenuItems(_pEditView->getCurrentBuffer()->getFormat());
+	enableConvertMenuItems(_pEditView->getCurrentBuffer()->getEolFormat());
 	checkUnicodeMenuItems();
 }
 
 
-void Notepad_plus::enableConvertMenuItems(FormatType format) const
+void Notepad_plus::enableConvertMenuItems(EolType format) const
 {
-	enableCommand(IDM_FORMAT_TODOS,  (format != FormatType::windows), MENU);
-	enableCommand(IDM_FORMAT_TOUNIX, (format != FormatType::unix),    MENU);
-	enableCommand(IDM_FORMAT_TOMAC,  (format != FormatType::macos),   MENU);
+	enableCommand(IDM_FORMAT_TODOS, (format != EolType::windows), MENU);
+	enableCommand(IDM_FORMAT_TOUNIX, (format != EolType::unix), MENU);
+	enableCommand(IDM_FORMAT_TOMAC, (format != EolType::macos), MENU);
 }
 
 
@@ -4720,8 +4720,8 @@ void Notepad_plus::notifyBufferChanged(Buffer * buffer, int mask)
 		updateStatusBar();
 		checkUnicodeMenuItems(/*buffer->getUnicodeMode()*/);
 		setUniModeText();
-		setDisplayFormat(buffer->getFormat());
-		enableConvertMenuItems(buffer->getFormat());
+		setDisplayFormat(buffer->getEolFormat());
+		enableConvertMenuItems(buffer->getEolFormat());
 	}
 }
 
@@ -4749,8 +4749,8 @@ void Notepad_plus::notifyBufferActivated(BufferID bufid, int view)
 	updateStatusBar();
 	checkUnicodeMenuItems(/*buf->getUnicodeMode()*/);
 	setUniModeText();
-	setDisplayFormat(buf->getFormat());
-	enableConvertMenuItems(buf->getFormat());
+	setDisplayFormat(buf->getEolFormat());
+	enableConvertMenuItems(buf->getEolFormat());
 	generic_string dir(buf->getFullPathName());
 	PathRemoveFileSpec(dir);
 	setWorkingDir(dir.c_str());

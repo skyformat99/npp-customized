@@ -1703,7 +1703,7 @@ void ScintillaEditView::bufferUpdated(Buffer * buffer, int mask)
 
 		if (mask & BufferChangeFormat)
 		{
-			execute(SCI_SETEOLMODE, static_cast<int>(_currentBuffer->getFormat()));
+			execute(SCI_SETEOLMODE, static_cast<int>(_currentBuffer->getEolFormat()));
 		}
 		if (mask & BufferChangeReadonly)
 		{
