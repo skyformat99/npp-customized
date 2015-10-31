@@ -637,7 +637,11 @@ void Notepad_plus::command(int id)
 
 		case IDM_MACRO_PLAYBACKRECORDEDMACRO:
 			if (!_recordingMacro) // if we're not currently recording, then playback the recorded keystrokes
+			{
+				_playingBackMacro = true;
 				macroPlayback(_macro);
+				_playingBackMacro = false;
+			}
 			break;
 
 		case IDM_MACRO_RUNMULTIMACRODLG :
@@ -1349,7 +1353,7 @@ void Notepad_plus::command(int id)
 
 			//Resize the tab height
 			int tabDpiDynamicalWidth = NppParameters::getInstance()->_dpiManager.scaleX(45);
-			int tabDpiDynamicalHeight = NppParameters::getInstance()->_dpiManager.scaleY(_toReduceTabBar?20:25);
+			int tabDpiDynamicalHeight = NppParameters::getInstance()->_dpiManager.scaleY(_toReduceTabBar?22:25);
 			TabCtrl_SetItemSize(_mainDocTab.getHSelf(), tabDpiDynamicalWidth, tabDpiDynamicalHeight);
 			TabCtrl_SetItemSize(_subDocTab.getHSelf(), tabDpiDynamicalWidth, tabDpiDynamicalHeight);
 			_docTabIconList.setIconSize(iconDpiDynamicalSize);
@@ -1398,7 +1402,7 @@ void Notepad_plus::command(int id)
 
 			// This part is just for updating (redraw) the tabs
 			{
-				int tabDpiDynamicalHeight = NppParameters::getInstance()->_dpiManager.scaleY(TabBarPlus::drawTabCloseButton()?21:20);
+				int tabDpiDynamicalHeight = NppParameters::getInstance()->_dpiManager.scaleY(TabBarPlus::drawTabCloseButton()?22:22);
 				int tabDpiDynamicalWidth = NppParameters::getInstance()->_dpiManager.scaleX(TabBarPlus::drawTabCloseButton() ? 60:45);
 				TabCtrl_SetItemSize(_mainDocTab.getHSelf(), tabDpiDynamicalWidth, tabDpiDynamicalHeight);
 				TabCtrl_SetItemSize(_subDocTab.getHSelf(), tabDpiDynamicalWidth, tabDpiDynamicalHeight);
@@ -2377,6 +2381,7 @@ void Notepad_plus::command(int id)
         case IDM_LANG_HTML :
         case IDM_LANG_XML :
         case IDM_LANG_JS :
+		case IDM_LANG_JSON :
         case IDM_LANG_PHP :
         case IDM_LANG_ASP :
         case IDM_LANG_CSS :

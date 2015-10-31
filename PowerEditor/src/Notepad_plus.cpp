@@ -327,7 +327,7 @@ LRESULT Notepad_plus::init(HWND hwnd)
 			::SendMessage(_mainDocTab.getHSelf(), WM_SETFONT, (WPARAM)hf, MAKELPARAM(TRUE, 0));
 			::SendMessage(_subDocTab.getHSelf(), WM_SETFONT, (WPARAM)hf, MAKELPARAM(TRUE, 0));
 		}
-		int tabDpiDynamicalHeight = NppParameters::getInstance()->_dpiManager.scaleY(20);
+		int tabDpiDynamicalHeight = NppParameters::getInstance()->_dpiManager.scaleY(22);
 		int tabDpiDynamicalWidth = NppParameters::getInstance()->_dpiManager.scaleX(45);
 		TabCtrl_SetItemSize(_mainDocTab.getHSelf(), tabDpiDynamicalWidth, tabDpiDynamicalHeight);
 		TabCtrl_SetItemSize(_subDocTab.getHSelf(), tabDpiDynamicalWidth, tabDpiDynamicalHeight);
@@ -2572,7 +2572,9 @@ enum LangType Notepad_plus::menuID2LangType(int cmdID)
         case IDM_LANG_XML :
             return L_XML;
         case IDM_LANG_JS :
-            return L_JS;
+			return L_JAVASCRIPT;
+		case IDM_LANG_JSON:
+			return L_JSON;
         case IDM_LANG_PHP :
             return L_PHP;
         case IDM_LANG_ASP :
@@ -3167,7 +3169,9 @@ bool Notepad_plus::removeBufferFromView(BufferID id, int whichOne)
 				toActivate = active;    //activate the 'active' index. Since we remove the tab first, the indices shift (on the right side)
 			}
 			tabToClose->deletItemAt((size_t)index); //delete first
+			_isFolding = true; // So we can ignore events while folding is taking place
 			activateBuffer(tabToClose->getBufferByIndex(toActivate), whichOne);     //then activate. The prevent jumpy tab behaviour
+			_isFolding = false;
 		}
 	}
 	else
@@ -3878,7 +3882,8 @@ bool Notepad_plus::saveScintillaParams()
 
 bool Notepad_plus::addCurrentMacro()
 {
-	vector<MacroShortcut> & theMacros = (NppParameters::getInstance())->getMacroList();
+	NppParameters* nppParams = NppParameters::getInstance();
+	vector<MacroShortcut> & theMacros = nppParams->getMacroList();
 
 	int nbMacro = theMacros.size();
 
@@ -3897,7 +3902,7 @@ bool Notepad_plus::addCurrentMacro()
             // Insert the separator and modify/delete command
 			::InsertMenu(hMacroMenu, posBase + nbMacro + 1, MF_BYPOSITION, (unsigned int)-1, 0);
 
-			NativeLangSpeaker *pNativeLangSpeaker = (NppParameters::getInstance())->getNativeLangSpeaker();
+			NativeLangSpeaker *pNativeLangSpeaker = nppParams->getNativeLangSpeaker();
 			generic_string nativeLangShortcutMapperMacro = pNativeLangSpeaker->getNativeLangMenuString(IDM_SETTING_SHORTCUT_MAPPER_MACRO);
 			if (nativeLangShortcutMapperMacro == TEXT(""))
 				nativeLangShortcutMapperMacro = TEXT("Modify Shortcut/Delete Macro...");
@@ -3907,6 +3912,7 @@ bool Notepad_plus::addCurrentMacro()
 		theMacros.push_back(ms);
 		::InsertMenu(hMacroMenu, posBase + nbMacro, MF_BYPOSITION, cmdID, ms.toMenuItemString().c_str());
 		_accelerator.updateShortcuts();
+		nppParams->setShortcutDirty();
 		return true;
 	}
 	return false;
