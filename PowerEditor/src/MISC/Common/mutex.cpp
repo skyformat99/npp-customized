@@ -1,3 +1,10 @@
+// YUNI's default license is the GNU Lesser Public License (LGPL), with some
+// exclusions (see below). This basically means that you can get the full source
+// code for nothing, so long as you adhere to a few rules.
+// 
+// Under the LGPL you may use YUNI for any purpose you wish, and modify it if you
+// require, as long as you:
+// 
 // Pass on the (modified) YUNI source code with your software, with original 
 // copyrights intact :
 //  * If you distribute electronically, the source can be a separate download
