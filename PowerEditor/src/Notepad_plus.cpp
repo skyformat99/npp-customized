@@ -2122,8 +2122,8 @@ void Notepad_plus::setDisplayFormat(EolType format)
 	const TCHAR* str = TEXT("??");
 	switch (format)
 	{
-		case EolType::windows: str = TEXT("Dos\\Windows"); break;
-		case EolType::macos:   str = TEXT("Macintosh"); break;
+		case EolType::windows: str = TEXT("DOS"); break;
+		case EolType::macos:   str = TEXT("MAC"); break;
 		case EolType::unix:    str = TEXT("UNIX"); break;
 		case EolType::unknown: str = TEXT("Unknown"); assert(false);  break;
 	}
@@ -2144,7 +2144,7 @@ void Notepad_plus::setUniModeText()
 		switch (um)
 		{
 			case uniUTF8:
-				uniModeTextString = TEXT("UTF-8-BOM"); break;
+				uniModeTextString = TEXT("UTF-8 BOM"); break;
 			case uni16BE:
 				uniModeTextString = TEXT("UCS-2 BE BOM"); break;
 			case uni16LE:

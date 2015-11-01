@@ -242,7 +242,7 @@
                     <Item id="44081" name="工程面板1" />
                     <Item id="44082" name="工程面板2" />
                     <Item id="44083" name="工程面板3" />
-                    <Item id="45001" name="转换为 Windows 格式" />
+                    <Item id="45001" name="转换为 DOS 格式" />
                     <Item id="45002" name="转换为 UNIX 格式" />
                     <Item id="45003" name="转换为 MAC 格式" />
                     <Item id="45004" name="以 ANSI 格式编码" />
