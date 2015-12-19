@@ -1528,6 +1528,10 @@ void ScintillaEditView::defineDocType(LangType typeDoc)
 	    setSpecialStyle(styleLN);
     }
     setTabSettings(_pParameter->getLangFromID(typeDoc));
+
+	execute(SCI_SETSTYLEBITS, 8);	// Always use 8 bit mask in Document class (Document::stylingBitsMask),
+									// in that way Editor::PositionIsHotspot will return correct hotspot styleID.
+									// This value has no effect on LexAccessor::mask.
 }
 
 BufferID ScintillaEditView::attachDefaultDoc()
@@ -3165,4 +3169,17 @@ generic_string ScintillaEditView::getEOLString()
 	{
 		return TEXT("\r");
 	}
+}
+
+void ScintillaEditView::setBorderEdge(bool doWithBorderEdge)
+{
+	long exStyle = ::GetWindowLongPtr(_hSelf, GWL_EXSTYLE);
+
+	if (doWithBorderEdge)
+		exStyle |= WS_EX_CLIENTEDGE;
+	else
+		exStyle &= ~WS_EX_CLIENTEDGE;
+
+	::SetWindowLongPtr(_hSelf, GWL_EXSTYLE, exStyle);
+	::SetWindowPos(_hSelf, NULL, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
 }

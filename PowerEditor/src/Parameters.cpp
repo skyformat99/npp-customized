@@ -722,6 +722,7 @@ generic_string ThemeSwitcher::getThemeFromXmlFileName(const TCHAR *xmlFullPath) 
 
 #pragma warning(disable : 4996)
 
+
 winVer getWindowsVersion()
 {
 	OSVERSIONINFOEX osvi;
@@ -750,6 +751,9 @@ winVer getWindowsVersion()
    {
 		case VER_PLATFORM_WIN32_NT:
 		{
+			if (osvi.dwMajorVersion == 10 && osvi.dwMinorVersion == 0)
+				return WV_WIN10;
+
 			if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 3)
 				return WV_WIN81;
 
@@ -4718,6 +4722,16 @@ void NppParameters::feedScintillaParam(TiXmlNode *node)
 			_svp._edgeMode = EDGE_NONE;
 	}
 
+	// Do Scintilla border edge
+	nm = element->Attribute(TEXT("borderEdge"));
+	if (nm)
+	{
+		if (!lstrcmp(nm, TEXT("yes")))
+			_svp._showBorderEdge = true;
+		else if (!lstrcmp(nm, TEXT("no")))
+			_svp._showBorderEdge = false;
+	}
+
 	int val;
 	nm = element->Attribute(TEXT("edgeNbColumn"), &val);
 	if (nm)
@@ -4892,6 +4906,7 @@ bool NppParameters::writeScintillaParams(const ScintillaViewParams & svp)
 	(scintNode->ToElement())->SetAttribute(TEXT("disableAdvancedScrolling"), svp._disableAdvancedScrolling?TEXT("yes"):TEXT("no"));
 	(scintNode->ToElement())->SetAttribute(TEXT("wrapSymbolShow"), svp._wrapSymbolShow?TEXT("show"):TEXT("hide"));
 	(scintNode->ToElement())->SetAttribute(TEXT("Wrap"), svp._doWrap?TEXT("yes"):TEXT("no"));
+	(scintNode->ToElement())->SetAttribute(TEXT("borderEdge"), svp._showBorderEdge ? TEXT("yes") : TEXT("no"));
 
 	TCHAR *edgeStr = NULL;
 	if (svp._edgeMode == EDGE_NONE)
@@ -6023,6 +6038,28 @@ int NppParameters::langTypeToCommandID(LangType lt) const
 				id = IDM_LANG_TEXT;
 	}
 	return id;
+}
+
+generic_string NppParameters:: getWinVersionStr() const
+{
+	switch (_winVersion)
+	{
+		case WV_WIN32S: return TEXT("Windows 3.1");
+		case WV_95: return TEXT("Windows 95");
+		case WV_98: return TEXT("Windows 98");
+		case WV_ME: return TEXT("Windows Millennium Edition");
+		case WV_NT: return TEXT("Windows NT");
+		case WV_W2K: return TEXT("Windows 2000");
+		case WV_XP: return TEXT("Windows XP");
+		case WV_S2003: return TEXT("Windows Server 2003");
+		case WV_XPX64: return TEXT("Windows XP 64 bits");
+		case WV_VISTA: return TEXT("Windows Vista");
+		case WV_WIN7: return TEXT("Windows 7");
+		case WV_WIN8: return TEXT("Windows 8");
+		case WV_WIN81: return TEXT("Windows 8.1");
+		case WV_WIN10: return TEXT("Windows 10");
+		default: /*case WV_UNKNOWN:*/ return TEXT("Windows unknown version");
+	}
 }
 
 void NppParameters::writeStyles(LexerStylerArray & lexersStylers, StyleArray & globalStylers)

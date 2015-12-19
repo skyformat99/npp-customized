@@ -866,6 +866,7 @@ struct ScintillaViewParams
 	int _borderWidth = 2;
 	bool _disableAdvancedScrolling = false;
 	bool _doSmoothFont = false;
+	bool _showBorderEdge = true;
 };
 
 const int NB_LIST = 20;
@@ -1494,7 +1495,8 @@ public:
 
 	bool getContextMenuFromXmlTree(HMENU mainMenuHadle, HMENU pluginsMenu);
 	bool reloadContextMenuFromXmlTree(HMENU mainMenuHadle, HMENU pluginsMenu);
-	winVer getWinVersion() { return _winVersion;};
+	winVer getWinVersion() const {return _winVersion;};
+	generic_string getWinVersionStr() const;
 	FindHistory & getFindHistory() {return _findHistory;};
 	bool _isFindReplacing; // an on the fly variable for find/replace functions
 	void safeWow64EnableWow64FsRedirection(BOOL Wow64FsEnableRedirection);
