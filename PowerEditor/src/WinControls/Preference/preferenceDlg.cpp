@@ -1331,6 +1331,8 @@ INT_PTR CALLBACK DefaultDirectoryDlg::run_dlgProc(UINT Message, WPARAM wParam, L
 			ETDTProc enableDlgTheme = (ETDTProc)pNppParam->getEnableThemeDlgTexture();
 			if (enableDlgTheme)
 				enableDlgTheme(_hSelf, ETDT_ENABLETAB);
+
+			::SendDlgItemMessage(_hSelf, IDC_OPENSAVEDIR_CHECK_USENEWSTYLESAVEDIALOG, BM_SETCHECK, nppGUI._useNewStyleSaveDlg ? BST_CHECKED : BST_UNCHECKED, 0);
 		}
 
 		case WM_COMMAND : 
@@ -1371,6 +1373,10 @@ INT_PTR CALLBACK DefaultDirectoryDlg::run_dlgProc(UINT Message, WPARAM wParam, L
 
 				case IDD_OPENSAVEDIR_ALWAYSON_BROWSE_BUTTON :
 					folderBrowser(_hSelf, IDC_OPENSAVEDIR_ALWAYSON_EDIT);
+					return TRUE;
+
+				case IDC_OPENSAVEDIR_CHECK_USENEWSTYLESAVEDIALOG:
+					nppGUI._useNewStyleSaveDlg = isCheckedOrNot(IDC_OPENSAVEDIR_CHECK_USENEWSTYLESAVEDIALOG);
 					return TRUE;
 
 				default:
@@ -1811,6 +1817,17 @@ INT_PTR CALLBACK TabSettings::run_dlgProc(UINT Message, WPARAM wParam, LPARAM/* 
                     {
                         Lang *lang = pNppParam->getLangFromIndex(index - 1);
                         if (!lang) return FALSE;
+						if (lang->_langID == L_JS)
+						{
+							Lang *ljs = pNppParam->getLangFromID(L_JAVASCRIPT);
+							ljs->_tabSize = size;
+						}
+						else if (lang->_langID == L_JAVASCRIPT)
+						{
+							Lang *ljavascript = pNppParam->getLangFromID(L_JS);
+							ljavascript->_tabSize = size;
+						}
+
                         lang->_tabSize = size;
 
                         // write in langs.xml
@@ -1836,6 +1853,18 @@ INT_PTR CALLBACK TabSettings::run_dlgProc(UINT Message, WPARAM wParam, LPARAM/* 
                         if (!lang) return FALSE;
                         if (!lang->_tabSize || lang->_tabSize == -1)
                             lang->_tabSize = nppGUI._tabSize;
+
+						if (lang->_langID == L_JS)
+						{
+							Lang *ljs = pNppParam->getLangFromID(L_JAVASCRIPT);
+							ljs->_isTabReplacedBySpace = isTabReplacedBySpace;
+						}
+						else if (lang->_langID == L_JAVASCRIPT)
+						{
+							Lang *ljavascript = pNppParam->getLangFromID(L_JS);
+							ljavascript->_isTabReplacedBySpace = isTabReplacedBySpace;
+						}
+
                         lang->_isTabReplacedBySpace = isTabReplacedBySpace;
 
                         // write in langs.xml
