@@ -47,6 +47,7 @@
 #include "ProjectPanel.h"
 #include "documentMap.h"
 #include "functionListPanel.h"
+#include "LongRunningOperation.h"
 
 using namespace std;
 
@@ -274,6 +275,9 @@ LRESULT Notepad_plus::init(HWND hwnd)
 		_mainEditView.execute(SCI_SETFONTQUALITY, SC_EFF_QUALITY_LCD_OPTIMIZED);
 		_subEditView.execute(SCI_SETFONTQUALITY, SC_EFF_QUALITY_LCD_OPTIMIZED);
 	}
+
+	_mainEditView.setBorderEdge(svp1._showBorderEdge);
+	_subEditView.setBorderEdge(svp1._showBorderEdge);
 
 	_mainEditView.execute(SCI_SETCARETLINEVISIBLEALWAYS, true);
 	_subEditView.execute(SCI_SETCARETLINEVISIBLEALWAYS, true);
@@ -612,6 +616,7 @@ LRESULT Notepad_plus::init(HWND hwnd)
 	_findCharsInRangeDlg.init(_pPublicInterface->getHinst(), hwnd, &_pEditView);
 	_colEditorDlg.init(_pPublicInterface->getHinst(), hwnd, &_pEditView);
     _aboutDlg.init(_pPublicInterface->getHinst(), hwnd);
+	_debugInfoDlg.init(_pPublicInterface->getHinst(), hwnd, _isAdministrator, _pluginsManager.getLoadedPluginNames());
 	_runDlg.init(_pPublicInterface->getHinst(), hwnd);
 	_runMacroDlg.init(_pPublicInterface->getHinst(), hwnd);
 
@@ -1939,6 +1944,8 @@ void Notepad_plus::copyMarkedLines()
 
 void Notepad_plus::cutMarkedLines()
 {
+	LongRunningOperation op;
+
 	int lastLine = _pEditView->lastZeroBasedLineNumber();
 	generic_string globalStr = TEXT("");
 
@@ -1959,6 +1966,8 @@ void Notepad_plus::cutMarkedLines()
 
 void Notepad_plus::deleteMarkedLines(bool isMarked)
 {
+	LongRunningOperation op;
+
 	int lastLine = _pEditView->lastZeroBasedLineNumber();
 
 	_pEditView->execute(SCI_BEGINUNDOACTION);
@@ -1972,6 +1981,8 @@ void Notepad_plus::deleteMarkedLines(bool isMarked)
 
 void Notepad_plus::pasteToMarkedLines()
 {
+	LongRunningOperation op;
+
 	int clipFormat;
 	clipFormat = CF_UNICODETEXT;
 
@@ -2196,18 +2207,17 @@ void Notepad_plus::addHotSpot()
 
 	unsigned char style_hotspot = 0;
 	unsigned char mask = INDIC1_MASK;
+	// INDIC2_MASK == 255 and it represents MSB bit		
+	// only LEX_HTML and LEX_POSTSCRIPT use use INDIC2_MASK bit internally		
+	// LEX_HTML is using INDIC2_MASK bit even though it has only 127 states, so it is safe to overwrite 8th bit		
+	// INDIC2_MASK will be used for LEX_HTML		
 
-	// INDIC2_MASK == 255 and it represents MSB bit
-	// only LEX_HTML and LEX_POSTSCRIPT use use INDIC2_MASK bit internally
-	// LEX_HTML is using INDIC2_MASK bit even though it has only 127 states, so it is safe to overwrite 8th bit
-	// INDIC2_MASK will be used for LEX_HTML
+	// LEX_POSTSCRIPT is using INDIC2_MASK bit for "tokenization", and is using mask=31 in lexer,		
+	// therefore hotspot in LEX_POSTSCRIPT will be saved to 5th bit		
+	// there are only 15 states in LEX_POSTSCRIPT, so it is safe to overwrite 5th bit		
 
-	// LEX_POSTSCRIPT is using INDIC2_MASK bit for "tokenization", and is using mask=31 in lexer,
-	// therefore hotspot in LEX_POSTSCRIPT will be saved to 5th bit
-	// there are only 15 states in LEX_POSTSCRIPT, so it is safe to overwrite 5th bit
-
-	// rule of the thumb is, any lexet that calls: styler.StartAt(startPos, 255);
-	// must have special processing here, all other lexers are fine with INDIC1_MASK (7th bit)
+	// rule of the thumb is, any lexet that calls: styler.StartAt(startPos, 255);		
+	// must have special processing here, all other lexers are fine with INDIC1_MASK (7th bit)		
 
 	LangType type = _pEditView->getCurrentBuffer()->getLangType();
 
@@ -4832,13 +4842,18 @@ void Notepad_plus::loadCommandlineParams(const TCHAR * commandLine, CmdLineParam
 			int iView = currentView();	//store view since fileswitch can cause it to change
 			switchToFile(bufID);	//switch to the file. No deferred loading, but this way we can easily move the cursor to the right position
 
-            if (cn == -1)
-			_pEditView->execute(SCI_GOTOLINE, ln-1);
+			if (cn == -1)
+			{
+				_pEditView->execute(SCI_GOTOLINE, ln-1);
+			}
             else
             {
                 int pos = _pEditView->execute(SCI_FINDCOLUMN, ln-1, cn-1);
                 _pEditView->execute(SCI_GOTOPOS, pos);
             }
+
+			_pEditView->scrollPosToCenter(_pEditView->execute(SCI_GETCURRENTPOS));
+
 			switchEditViewTo(iView);	//restore view
 		}
 	}
